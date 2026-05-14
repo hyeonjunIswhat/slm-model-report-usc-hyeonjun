@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>CYBER TETRIS - Fully Functional</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Geist:wght@400;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&display=swap" rel="stylesheet"/>
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#dbfcff",
+                        "primary-fixed-dim": "#00dbe9",
+                        "secondary-container": "#fe00fe",
+                        "surface-container-lowest": "#070d1f",
+                        "surface-container-low": "#151b2d",
+                        "background": "#0c1324",
+                        "on-surface": "#dce1fb",
+                        "error": "#ffb4ab",
+                    },
+                    spacing: {
+                        "sidebar-width": "180px",
+                        "well-width": "320px"
+                    },
+                    fontFamily: {
+                        "display-lg": ["Space Grotesk"],
+                        "score-md": ["Space Grotesk"],
+                        "headline-md": ["Space Grotesk"],
+                        "body-lg": ["Geist"]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .grid-bg { background-size: 32px 32px; background-image: linear-gradient(to right, rgba(59, 73, 75, 0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(59, 73, 75, 0.2) 1px, transparent 1px); }
+        .glow-title { text-shadow: 0 0 20px #00dbe9; -webkit-text-stroke: 1px #dbfcff; }
+        .cyber-panel { background-color: rgba(15, 23, 42, 0.6); border: 1px solid rgba(0, 219, 233, 0.2); backdrop-filter: blur(20px); }
+        .block { width: 32px; height: 32px; position: absolute; border: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; }
+        .block-active { border: 2px solid rgba(255,255,255,0.5); box-shadow: 0 0 10px currentColor; }
+        .screen { display: none; }
+        .screen.active { display: flex; }
+        .chromatic-aberration { text-shadow: -2px 0 #fe00fe, 2px 0 #00dbe9; }
+        canvas { display: block; background: transparent; }
+    </style>
+</head>
+<body class="bg-background text-on-surface min-h-screen overflow-hidden font-body-lg">
+
+    <!-- 1. 메인 메뉴 화면 -->
+    <div id="screen-menu" class="screen active flex-col items-center justify-center min-h-screen relative">
+        <div class="text-center mb-16 relative z-10">
+            <h1 class="font-display-lg text-[72px] text-primary glow-title uppercase tracking-widest">CYBER TETRIS</h1>
+            <p class="font-label-caps text-primary-fixed-dim mt-4 tracking-[0.3em] uppercase opacity-80">System Initialized // Ready</p>
+        </div>
+        <div class="flex flex-col gap-6 w-full max-w-md z-10">
+            <button onclick="startGame()" class="border-2 border-primary-fixed-dim shadow-[0_0_15px_#00dbe9] hover:bg-primary-fixed-dim/10 py-4 px-8 rounded flex items-center justify-between group transition-all">
+                <span class="font-headline-md tracking-wider text-primary">NEW GAME</span>
+                <span class="material-symbols-outlined text-primary-fixed-dim">sports_esports</span>
+            </button>
+            <div class="grid grid-cols-2 gap-6">
+                <button class="border border-secondary-container hover:shadow-[0_0_15px_#fe00fe] py-3 px-6 rounded flex flex-col items-center justify-center gap-2 group h-32 transition-all">
+                    <span class="material-symbols-outlined text-3xl text-secondary-container">leaderboard</span>
+                    <span class="text-xs tracking-widest">LEADERBOARD</span>
+                </button>
+                <button onclick="showScreen('screen-settings')" class="border border-secondary-container hover:shadow-[0_0_15px_#fe00fe] py-3 px-6 rounded flex flex-col items-center justify-center gap-2 group h-32 transition-all">
+                    <span class="material-symbols-outlined text-3xl text-secondary-container">settings</span>
+                    <span class="text-xs tracking-widest">SETTINGS</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 게임 플레이 화면 -->
+    <div id="screen-game" class="screen flex-col items-center justify-center min-h-screen relative">
+        <div class="flex flex-col lg:flex-row gap-8 items-start relative z-10">
+            <!-- 좌측 정보 -->
+            <div class="hidden md:flex flex-col items-end gap-8 w-32 mt-12">
+                <div class="text-right">
+                    <div class="text-[10px] text-primary-fixed-dim tracking-widest uppercase">COMBO</div>
+                    <div id="combo-text" class="font-display-lg text-4xl text-secondary-container">x0</div>
+                </div>
+            </div>
+
+            <!-- 게임 필드 -->
+            <div class="relative">
+                <div class="absolute -top-10 left-0 text-primary-fixed-dim text-xs font-mono">STATUS: OPERATIONAL</div>
+                <div id="tetris-well" class="w-well-width h-[640px] bg-surface-container-lowest border-2 border-primary-fixed-dim/30 rounded-sm relative overflow-hidden grid-bg shadow-[0_0_30px_rgba(0,0,0,0.8)]">
+                    <!-- 캔버스로 게임 렌더링 -->
+                    <canvas id="game-canvas" width="320" height="640"></canvas>
+                </div>
+            </div>
+
+            <!-- 우측 정보 -->
+            <div class="flex flex-col gap-6 w-32">
+                <div class="bg-surface-container-low border border-white/10 p-2 rounded">
+                    <div class="text-[10px] text-on-surface-variant mb-2 border-b border-white/10 pb-1">NEXT</div>
+                    <canvas id="next-canvas" width="96" height="64"></canvas>
+                </div>
+                <div class="text-right border-r-2 border-primary-fixed-dim pr-2">
+                    <div class="text-[10px] text-on-surface-variant">SCORE</div>
+                    <div id="score-text" class="font-score-md text-2xl text-primary">000,000</div>
+                </div>
+                <div class="text-right border-r-2 border-secondary-container pr-2">
+                    <div class="text-[10px] text-on-surface-variant">LEVEL</div>
+                    <div id="level-text" class="font-score-md text-2xl text-primary">01</div>
+                </div>
+                <button onclick="pauseGame()" class="mt-4 border border-white/20 p-2 hover:bg-white/10 transition-all">
+                    <span class="material-symbols-outlined">pause</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 게임 오버 화면 -->
+    <div id="screen-gameover" class="screen flex-col items-center justify-center min-h-screen bg-background/90 backdrop-blur-md absolute inset-0 z-50">
+        <h1 class="font-display-lg text-[72px] text-error uppercase tracking-tighter glow-red chromatic-aberration mb-4">SYSTEM CRASH</h1>
+        <div class="glass-panel p-8 rounded-lg border border-primary/20 text-center mb-10 w-full max-w-md">
+            <h3 class="text-primary text-xs tracking-widest mb-2">FINAL SCORE</h3>
+            <div id="final-score" class="font-display-lg text-6xl text-on-surface mb-6">000,000</div>
+            <div class="flex gap-4">
+                <button onclick="startGame()" class="flex-1 border-2 border-primary text-primary py-3 rounded hover:bg-primary/10 transition-all font-bold">REBOOT</button>
+                <button onclick="showScreen('screen-menu')" class="flex-1 border border-secondary-container text-secondary-container py-3 rounded hover:bg-secondary-container/10 transition-all">EXIT</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. 설정 화면 (간략화) -->
+    <div id="screen-settings" class="screen flex-col items-center justify-center min-h-screen">
+        <div class="cyber-panel p-8 rounded-lg w-full max-w-lg">
+            <h2 class="font-headline-lg text-primary mb-6 border-b border-primary/20 pb-4">SETTINGS</h2>
+            <div class="space-y-6">
+                <div class="flex justify-between items-center">
+                    <span>GHOST PIECE</span>
+                    <input type="checkbox" checked class="w-12 h-6 bg-slate-700 rounded-full appearance-none checked:bg-cyan-500 cursor-pointer transition-all">
+                </div>
+                <div class="flex justify-between items-center">
+                    <span>MASTER VOLUME</span>
+                    <input type="range" class="accent-cyan-500">
+                </div>
+            </div>
+            <button onclick="showScreen('screen-menu')" class="mt-10 w-full border border-primary py-3 hover:bg-primary/10">BACK TO MENU</button>
+        </div>
+    </div>
+
+    <script>
+        /** 테트리스 로직 **/
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const nextCanvas = document.getElementById('next-canvas');
+        const nextCtx = nextCanvas.getContext('2d');
+
+        const COLS = 10;
+        const ROWS = 20;
+        const BLOCK_SIZE = 32;
+
+        const COLORS = {
+            I: '#00f0ff',
+            J: '#0055ff',
+            L: '#ffaa00',
+            O: '#f0f000',
+            S: '#00ff00',
+            T: '#aa00ff',
+            Z: '#ff0000'
+        };
+
+        const SHAPES = {
+            I: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+            J: [[1,0,0],[1,1,1],[0,0,0]],
+            L: [[0,0,1],[1,1,1],[0,0,0]],
+            O: [[1,1],[1,1]],
+            S: [[0,1,1],[1,1,0],[0,0,0]],
+            T: [[0,1,0],[1,1,1],[0,0,0]],
+            Z: [[1,1,0],[0,1,1],[0,0,0]]
+        };
+
+        let grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+        let score = 0;
+        let level = 1;
+        let gameInterval;
+        let isPaused = false;
+
+        let currentPiece = null;
+        let nextPiece = null;
+
+        function createPiece(type) {
+            return {
+                type,
+                shape: SHAPES[type],
+                color: COLORS[type],
+                x: Math.floor(COLS/2) - Math.floor(SHAPES[type][0].length/2),
+                y: 0
+            };
+        }
+
+        function drawBlock(ctx, x, y, color, isGhost = false) {
+            ctx.fillStyle = color;
+            ctx.globalAlpha = isGhost ? 0.2 : 1;
+            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            ctx.strokeStyle = isGhost ? color : 'rgba(255,255,255,0.5)';
+            ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            ctx.globalAlpha = 1;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 그리드 배경 그리기 (선택 사항)
+            grid.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) drawBlock(ctx, x, y, value);
+                });
+            });
+
+            if (currentPiece) {
+                // 고스트 피스 계산
+                let ghostY = currentPiece.y;
+                while (!collision(currentPiece.x, ghostY + 1, currentPiece.shape)) {
+                    ghostY++;
+                }
+                currentPiece.shape.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) {
+                            drawBlock(ctx, currentPiece.x + x, ghostY + y, currentPiece.color, true);
+                            drawBlock(ctx, currentPiece.x + x, currentPiece.y + y, currentPiece.color);
+                        }
+                    });
+                });
+            }
+        }
+
+        function collision(x, y, shape) {
+            return shape.some((row, dy) => {
+                return row.some((value, dx) => {
+                    let newX = x + dx;
+                    let newY = y + dy;
+                    return value && (newX < 0 || newX >= COLS || newY >= ROWS || (newY >= 0 && grid[newY][newX]));
+                });
+            });
+        }
+
+        function rotate(shape) {
+            return shape[0].map((_, i) => shape.map(row => row[i]).reverse());
+        }
+
+        function lockPiece() {
+            currentPiece.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) grid[currentPiece.y + y][currentPiece.x + x] = currentPiece.color;
+                });
+            });
+            clearLines();
+            spawnPiece();
+        }
+
+        function clearLines() {
+            let linesCleared = 0;
+            for (let y = ROWS - 1; y >= 0; y--) {
+                if (grid[y].every(value => value !== 0)) {
+                    grid.splice(y, 1);
+                    grid.unshift(Array(COLS).fill(0));
+                    linesCleared++;
+                    y++;
+                }
+            }
+            if (linesCleared > 0) {
+                score += [0, 100, 300, 500, 800][linesCleared] * level;
+                document.getElementById('score-text').innerText = score.toLocaleString().padStart(7, '0');
+                if (score > level * 2000) {
+                    level++;
+                    document.getElementById('level-text').innerText = level.toString().padStart(2, '0');
+                    resetInterval();
+                }
+            }
+        }
+
+        function spawnPiece() {
+            currentPiece = nextPiece || createPiece(Object.keys(SHAPES)[Math.floor(Math.random() * 7)]);
+            nextPiece = createPiece(Object.keys(SHAPES)[Math.floor(Math.random() * 7)]);
+            
+            drawNext();
+
+            if (collision(currentPiece.x, currentPiece.y, currentPiece.shape)) {
+                gameOver();
+            }
+        }
+
+        function drawNext() {
+            nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+            nextPiece.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        nextCtx.fillStyle = nextPiece.color;
+                        nextCtx.fillRect(x * 20 + 20, y * 20 + 10, 18, 18);
+                    }
+                });
+            });
+        }
+
+        function moveDown() {
+            if (!collision(currentPiece.x, currentPiece.y + 1, currentPiece.shape)) {
+                currentPiece.y++;
+            } else {
+                lockPiece();
+            }
+            draw();
+        }
+
+        function resetInterval() {
+            clearInterval(gameInterval);
+            gameInterval = setInterval(moveDown, Math.max(100, 800 - (level * 50)));
+        }
+
+        /** 화면 관리 **/
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function startGame() {
+            grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+            score = 0;
+            level = 1;
+            document.getElementById('score-text').innerText = "000,000";
+            document.getElementById('level-text').innerText = "01";
+            showScreen('screen-game');
+            spawnPiece();
+            resetInterval();
+        }
+
+        function pauseGame() {
+            isPaused = !isPaused;
+            if (isPaused) clearInterval(gameInterval);
+            else resetInterval();
+        }
+
+        function gameOver() {
+            clearInterval(gameInterval);
+            document.getElementById('final-score').innerText = score.toLocaleString();
+            showScreen('screen-gameover');
+        }
+
+        /** 키보드 컨트롤 **/
+        window.addEventListener('keydown', (e) => {
+            if (document.getElementById('screen-game').classList.contains('active')) {
+                if (e.key === 'ArrowLeft' || e.key === 'a') {
+                    if (!collision(currentPiece.x - 1, currentPiece.y, currentPiece.shape)) currentPiece.x--;
+                } else if (e.key === 'ArrowRight' || e.key === 'd') {
+                    if (!collision(currentPiece.x + 1, currentPiece.y, currentPiece.shape)) currentPiece.x++;
+                } else if (e.key === 'ArrowDown' || e.key === 's') {
+                    moveDown();
+                } else if (e.key === 'ArrowUp' || e.key === 'w') {
+                    const rotated = rotate(currentPiece.shape);
+                    if (!collision(currentPiece.x, currentPiece.y, rotated)) currentPiece.shape = rotated;
+                } else if (e.key === ' ') {
+                    while (!collision(currentPiece.x, currentPiece.y + 1, currentPiece.shape)) {
+                        currentPiece.y++;
+                    }
+                    lockPiece();
+                }
+                draw();
+            }
+        });
+    </script>
+</body>
+</html>
